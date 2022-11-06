@@ -1,0 +1,839 @@
+//***************************************************************************************************************************************
+/* Librería para el uso de la pantalla ILI9341 en modo 8 bits
+ * Basado en el código de martinayotte - https://www.stm32duino.com/viewtopic.php?t=637
+ * Adaptación, migración y creación de nuevas funciones: Pablo Mazariegos y José Morales
+ * Con ayuda de: José Guerra
+ * IE3027: Electrónica Digital 2 - 2019
+ */
+//***************************************************************************************************************************************
+#include <stdint.h>
+#include <stdbool.h>
+#include "TM4C123GH6PM.h"
+#include "inc/hw_ints.h"
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "driverlib/debug.h"
+#include "driverlib/gpio.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/rom_map.h"
+#include "driverlib/rom.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/timer.h"
+
+#include "bitmaps.h"
+#include "font.h"
+#include "lcd_registers.h"
+
+#define LCD_RST PD_0
+#define LCD_CS PD_1
+#define LCD_RS PD_2
+#define LCD_WR PD_3
+#define LCD_RD PE_1
+int DPINS[] = {PB_0, PB_1, PB_2, PB_3, PB_4, PB_5, PB_6, PB_7};  
+
+
+
+//***************************************************************************************************************************************
+// Functions Prototypes
+//***************************************************************************************************************************************
+void LCD_Init(void);
+void LCD_CMD(uint8_t cmd);
+void LCD_DATA(uint8_t data);
+void SetWindows(unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2);
+void LCD_Clear(unsigned int c);
+void H_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c);
+void V_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c);
+void Rect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
+void FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
+void LCD_Print(String text, int x, int y, int fontSize, int color, int background);
+void LCD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned char bitmap[]);
+void LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset);
+
+
+// **********************************************************ejercicio 4****************************************************** 
+extern uint8_t fondo[];
+extern uint8_t carro_azul[];
+extern uint8_t carro_rojo[];
+extern uint8_t explosion[];
+extern uint8_t menu[];
+extern uint8_t muerte[];
+extern uint8_t cars[];
+//const int button1 = PUSH1;
+//const int button2 = PUSH2;
+const int button1 = PA_6;
+const int button2 = PA_7;
+const int button3 = PF_1;
+
+int x = 85;
+int y = 0;
+int azulx=0;
+int estado_juego = 0;
+int mapa_juego = 0;
+int puntos = 0;
+
+int velocidad = 15;
+int x1=187;
+int previusMillis1 = 0;
+int previusMillis2 = 0;
+int previusMillis3 = 0;
+
+ int buttonState1 = 0;
+ int buttonState2 = 0;
+ int buttonState3 = 0;
+//***********************************************************************************************************************
+ 
+//***************************************************************************************************************************************
+// Inicialización
+//***************************************************************************************************************************************
+void setup() {
+  // Frecuencia de reloj (utiliza TivaWare)
+  SysCtlClockSet(SYSCTL_SYSDIV_2_5|SYSCTL_USE_PLL|SYSCTL_OSC_MAIN|SYSCTL_XTAL_16MHZ);
+  Serial.begin(9600);
+  // Configuración del puerto (utiliza TivaWare)
+  GPIOPadConfigSet(GPIO_PORTB_BASE, 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7, GPIO_STRENGTH_8MA, GPIO_PIN_TYPE_STD_WPU);
+  Serial.println("Inicio");
+  
+  // Inicialización de la pantalla
+  LCD_Init();
+//  if (estado_juego==1){
+     LCD_Clear(0x0000);
+////      LCD_Bitmap(0, 0, 320, 240, fondo);
+//      FillRect(85, 0, 150, 240, 0x632C); //carretera
+//      FillRect(85, 0, 150, 240, 0x632C); //carretera
+//     FillRect(85, 0, 150, 240, 0x632C); //carretera
+//      V_line (135, 0, 240, 0xFFE0);
+//     V_line (185, 0, 240, 0xFFE0);
+//////  
+////  
+//}
+  
+
+  // Referencia para colores RGB565: http://www.rinkydinkelectronics.com/calc_rgb565.php
+
+  // Pantalla es de 320x240 pixeles (si está configurada en horizontal)
+  // 320px = ancho     240px = alto
+  // Esquina superior izquierda (x,y) = (0,0)
+
+  // void Rect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
+  //Rect(160, 120, 100, 50, 0xFFFF);
+  //Rect(160-50, 120-25, 100, 50, 0xF800);
+
+  //void FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c);
+
+
+//  
+
+
+
+   
+  //void H_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c);
+  //H_line (20, 120, 280, 0x07E0);
+  
+  //void V_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c);
+  //V_line (160, 20, 200, 0xFFE0);
+
+  // void LCD_Print(String text, int x, int y, int fontSize, int color, int background);
+  // fontSize puede ser 1 ó 2. En "font.h" pueden ver los detalles
+ // String text1 = "Hola mundo!";
+  //LCD_Print(text1, 20, 120-16, 2, 0xffff, 0x0000);
+  //LCD_Print(text1, 20, 121, 1, 0xffff, 0x7BC0);
+
+//----------------------------------------------------------------
+
+  //LCD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned char bitmap[]);
+//*******************************Ejercicio 2****************************************************************************************************************************
+//  LCD_Bitmap(160-50-65,170-50+50-75,65,75,metal_slug);
+//  LCD_Bitmap(160+49,170-50+9,49,41,among);
+//  LCD_Bitmap(0,0,51,53,cocodile);
+ // LCD_Bitmap(160+49,170-50+9,40,40,crash_sprite);
+  //LCD_Sprite(0, 0, 40, 40, crash_sprite, 3, 0, 0, 0);
+  //LCD_Bitmap((320/2)-25,(240/2)-30,50,59,sonic);
+
+  //LCD_Bitmap(0,0,54,61,sonic_face);
+  //LCD_Bitmap((320/2) - 27, (240/2) - 30,54,61,sonic_face);
+
+
+//  // Cómo repetir imágenes? (Hacer texturas para fondos)
+//  for(int x = 0; x <319; x+=24){
+//    LCD_Bitmap(x, 240-24, 24, 24, tile);
+//  }
+
+ //LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset);
+ //LCD_Sprite(320/2 - 8, 240-24-32, 16, 32, mario_sprite, 3, 0, 0, 0);
+
+//***************************************************************ejercicio 4***********************************
+  pinMode (button1, INPUT_PULLUP);
+ pinMode (button2, INPUT_PULLUP);
+ pinMode (button3, INPUT_PULLUP);
+
+}
+//***************************************************************************************************************************************
+// Loop Infinito
+//***************************************************************************************************************************************
+void loop() {
+buttonState1 = digitalRead(button1);
+buttonState2 = digitalRead(button2);
+buttonState3 = digitalRead(button3);
+  //**************************************************************** ejercicio 3******************************************************************************************
+//  delay(100);
+//  LCD_Sprite(320/2 - 8, 240-24-32, 40, 40, crash_sprite, 3, 0, 0, 0);
+//
+////  delay(100);
+//  LCD_Sprite(320/2 - 8, 240-24-32, 40, 40, crash_sprite, 3, 1, 0, 0);
+//
+////  delay(100);
+//  LCD_Sprite(320/2 - 8, 240-24-32, 40, 32, crash_sprite, 3, 2, 0, 0);
+//  
+
+  //***********************************************************************************************************************************************************
+
+//
+//  for (int x = 0; x < 320-16; x++)
+//  {
+//    delay(2);
+//    int animationSpeed = (x/15) % 3; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+//    LCD_Sprite(x, 240-24-32, 40, 40, crash_sprite, 3, animationSpeed, 0, 0);
+//    V_line(x - 1, 240-24-32, 40, 0xffff);
+//  }
+//  for (int x = 320-16; x > 0; x--)
+//  {
+//    delay(2);
+//    int index_roll = (x/15) % 3; // El módulo debe ser igual a la cantidad de columnas de su sprite. El 
+//    LCD_Sprite(x, 240-24-32, 40, 40, crash_sprite, 3, index_roll, 1, 0);
+//    V_line(x + 40, 240-24-32, 40, 0xffff);
+//  }
+//
+
+   if (buttonState3 == LOW )
+    {
+      
+      mapa_juego = 0;
+      }
+
+if (mapa_juego==0){
+  puntos=0;
+  
+  LCD_Bitmap(83, 83, 154, 75, menu);
+   if (buttonState3 == LOW )
+    {
+      
+      mapa_juego = 1;
+      }
+  
+}
+
+if (mapa_juego==1 ){/// fondo para el juego
+  puntos=0;
+  LCD_Clear(0xffff);
+  
+  LCD_Bitmap(0, 0, 320, 240, fondo);
+  FillRect(85, 0, 150, 240, 0x632C); //carretera
+  FillRect(85, 0, 150, 240, 0x632C); //carretera
+  FillRect(85, 0, 150, 240, 0x632C); //carretera
+  V_line (135, 0, 240, 0xFFE0);
+  V_line (185, 0, 240, 0xFFE0);
+  mapa_juego++;
+
+}
+
+if (mapa_juego==3){
+   LCD_Clear(0x0000);
+   String text1 = "you are DEAD";
+    LCD_Print(text1, 60, 50, 2, 0xffff, 0x0000);
+  LCD_Bitmap(115, 116, 90, 124, muerte);
+  mapa_juego++;
+
+}
+
+if (mapa_juego==4){
+
+    
+  
+}
+
+
+if (mapa_juego==6){
+  mapa_juego++;
+  
+  String text2 = "WIN";
+    LCD_Print(text2, 150, 50, 2, 0xffff, 0x0000);
+  LCD_Bitmap(100, 88, 132, 64, cars);
+  
+}
+
+if (mapa_juego==7){
+  
+
+
+}
+
+
+
+
+
+if (mapa_juego==2){
+
+
+         // puntos=0;        
+          if (buttonState1 == LOW & buttonState2 == HIGH)
+          {
+                delay(10);
+                if (x == 235-49)
+                {
+                  x = 235 - 49;
+                }
+                else
+                {
+                 x++; 
+                }
+                int animationSpeed = (x/15) % 5; // El módulo debe ser igual a la cantidad de columnas de su sprite. El 
+                LCD_Sprite(x, 213, 49, 27, carro_rojo, 5, animationSpeed, 0, 0);
+                V_line(x - 1, 213, 27, 0x632C);
+          }
+          if (buttonState1 == HIGH & buttonState2 == LOW)
+          {
+              delay(10);
+              if (x == 85)
+              {
+                x = 85;
+                
+              }
+              else
+              {
+               x--; 
+              }
+              int animationSpeed = (x/15) % 5; // El módulo debe ser igual a la cantidad de columnas de su sprite. El 
+             
+              LCD_Sprite(x, 213, 49, 27, carro_rojo, 5, animationSpeed, 1, 0);
+              V_line(x + 49, 213, 27, 0x632C);
+          } 
+          if (buttonState1 == HIGH & buttonState2 == HIGH)
+          {
+              delay(10);
+             LCD_Sprite(x, 213, 49, 27, carro_rojo, 5, 0, 0, 0);
+          }
+          
+          
+          
+          
+              if(x1==400){
+                  
+                  int azulx = rand() % 2;
+                  if(azulx == 0){
+                    x1=85;
+                  }
+                  if(azulx == 1){
+                    x1=136;
+                  }
+                  if(azulx == 2){
+                    x1=187;
+                  }
+              }
+              if (x1==85){
+                unsigned long currentMillis1 =millis();
+                if (currentMillis1-previusMillis1 > 1) {
+                    
+                if (y  >  239){
+                    x1=400;
+                    y=0;
+                   
+                   //FillRect(85, 240-18, 150, 18, 0x632C);
+                   
+                  } 
+                  else {
+                    y=y+2;
+                  }
+                  int animationSpeed1 = (y/velocidad) % 7; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+                  LCD_Sprite(x1, y, 49, 18, carro_azul, 7, animationSpeed1, 0, 0);
+                  H_line(x1, y-1 , 43, 0x632C);
+                  
+                }
+                previusMillis1 =currentMillis1;
+                 //carretera
+                
+                
+              }
+              
+          
+              if (x1==187){
+                unsigned long currentMillis2 =millis();
+                if (currentMillis2-previusMillis2 > 1) {
+                    
+                if (y  >  240){
+                    x1=400;
+                    y=0;
+                   
+                  } 
+                else {
+                    y= y +2;
+                  }
+                  int animationSpeed1 = (y/velocidad) % 7; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+                  LCD_Sprite(x1, y, 49, 18, carro_azul, 7, animationSpeed1, 0, 0);
+                  H_line(x1, y-1 , 43, 0x632C);
+                  
+                }
+                previusMillis2 =currentMillis2; 
+              }
+          
+          
+          
+              if (x1==136){
+                unsigned long currentMillis2 =millis();
+                if (currentMillis2-previusMillis2 > 1) {
+                    
+                if (y  >  240){
+                    x1=400;
+                    y=0;
+                   
+                  } 
+                else {
+                    y= y +2;
+                  }
+                  int animationSpeed1 = (y/velocidad) % 7; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+                  LCD_Sprite(x1, y, 49, 18, carro_azul, 7, animationSpeed1, 0, 0);
+                  H_line(x1, y-1 , 43, 0x632C);
+                  
+                }
+                previusMillis2 =currentMillis2; 
+              }
+              
+          // perder----------------------------------------------------------------------------------------------------------------
+              if (y==200 & x>=x1 & (x1+49)>=x  ){
+                mapa_juego=3;
+
+                
+                }
+          
+                
+              if (y==200 & (x+49)>=x1 & (x1+49)>=(x+49 )  ){
+                mapa_juego=3;
+                
+                
+                }
+
+              if (y==230){
+                puntos = puntos +1;
+                
+                
+                }
+              else {
+                FillRect(320-50, 0, 15, 24, 0x0000);
+                
+                }
+          
+            
+}
+
+if (puntos==5){
+                mapa_juego=6;
+                }
+
+
+
+
+
+
+buttonState1 = digitalRead(button1);
+buttonState2 = digitalRead(button2);
+buttonState3 = digitalRead(button3);
+
+  
+   
+
+
+
+    
+
+ 
+  
+
+
+
+
+
+  // if (y < 240) 
+//  for (int y = 0; y < 240; y++)
+//  {
+//    delay(1);
+//    int animationSpeed1 = (y/15) % 7; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+//    LCD_Sprite(x1, y, 49, 18, carro_azul, 7, animationSpeed1, 0, 0);
+//    H_line(x1, y-1 , 40, 0x632C);
+//
+//    if (x1==85)
+//{
+//  
+//   LCD_Sprite(0, 0, 49, 27, carro_rojo, 5, 0, 0, 0);
+//}
+//
+//
+//  }
+
+
+
+
+//    for (int y1 = 0; y1 < 240; y1++)
+//  {
+//    delay(2);
+//    int animationSpeed2 = (y1/15) % 7; // El módulo debe ser igual a la cantidad de columnas de su sprite. El    /// el 3 es el modulo srpietes 
+//    LCD_Sprite(136, y1, 49, 18, carro_azul, 7, animationSpeed2, 0, 0);
+//    H_line(136, y1 , 40, 0x632C);
+//  }
+
+
+
+
+
+  
+}
+//***************************************************************************************************************************************
+// Función para inicializar LCD
+//***************************************************************************************************************************************
+void LCD_Init(void) {
+  pinMode(LCD_RST, OUTPUT);
+  pinMode(LCD_CS, OUTPUT);
+  pinMode(LCD_RS, OUTPUT);
+  pinMode(LCD_WR, OUTPUT);
+  pinMode(LCD_RD, OUTPUT);
+  for (uint8_t i = 0; i < 8; i++){
+    pinMode(DPINS[i], OUTPUT);
+  }
+  //****************************************
+  // Secuencia de Inicialización
+  //****************************************
+  digitalWrite(LCD_CS, HIGH);
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_WR, HIGH);
+  digitalWrite(LCD_RD, HIGH);
+  digitalWrite(LCD_RST, HIGH);
+  delay(5);
+  digitalWrite(LCD_RST, LOW);
+  delay(20);
+  digitalWrite(LCD_RST, HIGH);
+  delay(150);
+  digitalWrite(LCD_CS, LOW);
+  //****************************************
+  LCD_CMD(0xE9);  // SETPANELRELATED
+  LCD_DATA(0x20);
+  //****************************************
+  LCD_CMD(0x11); // Exit Sleep SLEEP OUT (SLPOUT)
+  delay(100);
+  //****************************************
+  LCD_CMD(0xD1);    // (SETVCOM)
+  LCD_DATA(0x00);
+  LCD_DATA(0x71);
+  LCD_DATA(0x19);
+  //****************************************
+  LCD_CMD(0xD0);   // (SETPOWER) 
+  LCD_DATA(0x07);
+  LCD_DATA(0x01);
+  LCD_DATA(0x08);
+  //****************************************
+  LCD_CMD(0x36);  // (MEMORYACCESS)
+  LCD_DATA(0x40|0x80|0x20|0x08); // LCD_DATA(0x19);
+  //****************************************
+  LCD_CMD(0x3A); // Set_pixel_format (PIXELFORMAT)
+  LCD_DATA(0x05); // color setings, 05h - 16bit pixel, 11h - 3bit pixel
+  //****************************************
+  LCD_CMD(0xC1);    // (POWERCONTROL2)
+  LCD_DATA(0x10);
+  LCD_DATA(0x10);
+  LCD_DATA(0x02);
+  LCD_DATA(0x02);
+  //****************************************
+  LCD_CMD(0xC0); // Set Default Gamma (POWERCONTROL1)
+  LCD_DATA(0x00);
+  LCD_DATA(0x35);
+  LCD_DATA(0x00);
+  LCD_DATA(0x00);
+  LCD_DATA(0x01);
+  LCD_DATA(0x02);
+  //****************************************
+  LCD_CMD(0xC5); // Set Frame Rate (VCOMCONTROL1)
+  LCD_DATA(0x04); // 72Hz
+  //****************************************
+  LCD_CMD(0xD2); // Power Settings  (SETPWRNORMAL)
+  LCD_DATA(0x01);
+  LCD_DATA(0x44);
+  //****************************************
+  LCD_CMD(0xC8); //Set Gamma  (GAMMASET)
+  LCD_DATA(0x04);
+  LCD_DATA(0x67);
+  LCD_DATA(0x35);
+  LCD_DATA(0x04);
+  LCD_DATA(0x08);
+  LCD_DATA(0x06);
+  LCD_DATA(0x24);
+  LCD_DATA(0x01);
+  LCD_DATA(0x37);
+  LCD_DATA(0x40);
+  LCD_DATA(0x03);
+  LCD_DATA(0x10);
+  LCD_DATA(0x08);
+  LCD_DATA(0x80);
+  LCD_DATA(0x00);
+  //****************************************
+  LCD_CMD(0x2A); // Set_column_address 320px (CASET)
+  LCD_DATA(0x00);
+  LCD_DATA(0x00);
+  LCD_DATA(0x01);
+  LCD_DATA(0x3F);
+  //****************************************
+  LCD_CMD(0x2B); // Set_page_address 480px (PASET)
+  LCD_DATA(0x00);
+  LCD_DATA(0x00);
+  LCD_DATA(0x01);
+  LCD_DATA(0xE0);
+//  LCD_DATA(0x8F);
+  LCD_CMD(0x29); //display on 
+  LCD_CMD(0x2C); //display on
+
+  LCD_CMD(ILI9341_INVOFF); //Invert Off
+  delay(120);
+  LCD_CMD(ILI9341_SLPOUT);    //Exit Sleep
+  delay(120);
+  LCD_CMD(ILI9341_DISPON);    //Display on
+  digitalWrite(LCD_CS, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para enviar comandos a la LCD - parámetro (comando)
+//***************************************************************************************************************************************
+void LCD_CMD(uint8_t cmd) {
+  digitalWrite(LCD_RS, LOW);
+  digitalWrite(LCD_WR, LOW);
+  GPIO_PORTB_DATA_R = cmd;
+  digitalWrite(LCD_WR, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para enviar datos a la LCD - parámetro (dato)
+//***************************************************************************************************************************************
+void LCD_DATA(uint8_t data) {
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_WR, LOW);
+  GPIO_PORTB_DATA_R = data;
+  digitalWrite(LCD_WR, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para definir rango de direcciones de memoria con las cuales se trabajara (se define una ventana)
+//***************************************************************************************************************************************
+void SetWindows(unsigned int x1, unsigned int y1, unsigned int x2, unsigned int y2) {
+  LCD_CMD(0x2a); // Set_column_address 4 parameters
+  LCD_DATA(x1 >> 8);
+  LCD_DATA(x1);   
+  LCD_DATA(x2 >> 8);
+  LCD_DATA(x2);   
+  LCD_CMD(0x2b); // Set_page_address 4 parameters
+  LCD_DATA(y1 >> 8);
+  LCD_DATA(y1);   
+  LCD_DATA(y2 >> 8);
+  LCD_DATA(y2);   
+  LCD_CMD(0x2c); // Write_memory_start
+}
+
+//***************************************************************************************************************************************
+// Función para borrar la pantalla - parámetros (color)
+//***************************************************************************************************************************************
+void LCD_Clear(unsigned int c){  
+  unsigned int x, y;
+  LCD_CMD(0x02c); // write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW);   
+  SetWindows(0, 0, 319, 239); // 479, 319);
+  for (x = 0; x < 320; x++)
+    for (y = 0; y < 240; y++) {
+      LCD_DATA(c >> 8); 
+      LCD_DATA(c); 
+    }
+  digitalWrite(LCD_CS, HIGH);
+} 
+
+//***************************************************************************************************************************************
+// Función para dibujar una línea horizontal - parámetros ( coordenada x, cordenada y, longitud, color)
+//*************************************************************************************************************************************** 
+void H_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c) {  
+  unsigned int i, j;
+  LCD_CMD(0x02c); //write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW);
+  l = l + x;
+  SetWindows(x, y, l, y);
+  j = l;// * 2;
+  for (i = 0; i < l; i++) {
+      LCD_DATA(c >> 8); 
+      LCD_DATA(c); 
+  }
+  digitalWrite(LCD_CS, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar una línea vertical - parámetros ( coordenada x, cordenada y, longitud, color)
+//*************************************************************************************************************************************** 
+void V_line(unsigned int x, unsigned int y, unsigned int l, unsigned int c) {  
+  unsigned int i,j;
+  LCD_CMD(0x02c); //write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW);
+  l = l + y;
+  SetWindows(x, y, x, l);
+  j = l; //* 2;
+  for (i = 1; i <= j; i++) {
+    LCD_DATA(c >> 8); 
+    LCD_DATA(c);
+  }
+  digitalWrite(LCD_CS, HIGH);  
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar un rectángulo - parámetros ( coordenada x, cordenada y, ancho, alto, color)
+//***************************************************************************************************************************************
+void Rect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c) {
+  H_line(x  , y  , w, c);
+  H_line(x  , y+h, w, c);
+  V_line(x  , y  , h, c);
+  V_line(x+w, y  , h, c);
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar un rectángulo relleno - parámetros ( coordenada x, cordenada y, ancho, alto, color)
+//***************************************************************************************************************************************
+void FillRect(unsigned int x, unsigned int y, unsigned int w, unsigned int h, unsigned int c) {
+  LCD_CMD(0x02c); // write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW); 
+  
+  unsigned int x2, y2;
+  x2 = x+w;
+  y2 = y+h;
+  SetWindows(x, y, x2-1, y2-1);
+  unsigned int k = w*h*2-1;
+  unsigned int i, j;
+  for (int i = 0; i < w; i++) {
+    for (int j = 0; j < h; j++) {
+      LCD_DATA(c >> 8);
+      LCD_DATA(c);
+      
+      //LCD_DATA(bitmap[k]);    
+      k = k - 2;
+     } 
+  }
+  digitalWrite(LCD_CS, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar texto - parámetros ( texto, coordenada x, cordenada y, color, background) 
+//***************************************************************************************************************************************
+void LCD_Print(String text, int x, int y, int fontSize, int color, int background) {
+  int fontXSize ;
+  int fontYSize ;
+  
+  if(fontSize == 1){
+    fontXSize = fontXSizeSmal ;
+    fontYSize = fontYSizeSmal ;
+  }
+  if(fontSize == 2){
+    fontXSize = fontXSizeBig ;
+    fontYSize = fontYSizeBig ;
+  }
+  
+  char charInput ;
+  int cLength = text.length();
+  Serial.println(cLength,DEC);
+  int charDec ;
+  int c ;
+  int charHex ;
+  char char_array[cLength+1];
+  text.toCharArray(char_array, cLength+1) ;
+  for (int i = 0; i < cLength ; i++) {
+    charInput = char_array[i];
+    Serial.println(char_array[i]);
+    charDec = int(charInput);
+    digitalWrite(LCD_CS, LOW);
+    SetWindows(x + (i * fontXSize), y, x + (i * fontXSize) + fontXSize - 1, y + fontYSize );
+    long charHex1 ;
+    for ( int n = 0 ; n < fontYSize ; n++ ) {
+      if (fontSize == 1){
+        charHex1 = pgm_read_word_near(smallFont + ((charDec - 32) * fontYSize) + n);
+      }
+      if (fontSize == 2){
+        charHex1 = pgm_read_word_near(bigFont + ((charDec - 32) * fontYSize) + n);
+      }
+      for (int t = 1; t < fontXSize + 1 ; t++) {
+        if (( charHex1 & (1 << (fontXSize - t))) > 0 ) {
+          c = color ;
+        } else {
+          c = background ;
+        }
+        LCD_DATA(c >> 8);
+        LCD_DATA(c);
+      }
+    }
+    digitalWrite(LCD_CS, HIGH);
+  }
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar una imagen a partir de un arreglo de colores (Bitmap) Formato (Color 16bit R 5bits G 6bits B 5bits)
+//***************************************************************************************************************************************
+void LCD_Bitmap(unsigned int x, unsigned int y, unsigned int width, unsigned int height, unsigned char bitmap[]){  
+  LCD_CMD(0x02c); // write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW); 
+  
+  unsigned int x2, y2;
+  x2 = x+width;
+  y2 = y+height;
+  SetWindows(x, y, x2-1, y2-1);
+  unsigned int k = 0;
+  unsigned int i, j;
+
+  for (int i = 0; i < width; i++) {
+    for (int j = 0; j < height; j++) {
+      LCD_DATA(bitmap[k]);
+      LCD_DATA(bitmap[k+1]);
+      //LCD_DATA(bitmap[k]);    
+      k = k + 2;
+     } 
+  }
+  digitalWrite(LCD_CS, HIGH);
+}
+
+//***************************************************************************************************************************************
+// Función para dibujar una imagen sprite - los parámetros columns = número de imagenes en el sprite, index = cual desplegar, flip = darle vuelta
+//***************************************************************************************************************************************
+void LCD_Sprite(int x, int y, int width, int height, unsigned char bitmap[],int columns, int index, char flip, char offset){
+  LCD_CMD(0x02c); // write_memory_start
+  digitalWrite(LCD_RS, HIGH);
+  digitalWrite(LCD_CS, LOW); 
+
+  unsigned int x2, y2;
+  x2 =   x+width;
+  y2=    y+height;
+  SetWindows(x, y, x2-1, y2-1);
+  int k = 0;
+  int ancho = ((width*columns));
+  if(flip){
+  for (int j = 0; j < height; j++){
+      k = (j*(ancho) + index*width -1 - offset)*2;
+      k = k+width*2;
+     for (int i = 0; i < width; i++){
+      LCD_DATA(bitmap[k]);
+      LCD_DATA(bitmap[k+1]);
+      k = k - 2;
+     } 
+  }
+  }else{
+     for (int j = 0; j < height; j++){
+      k = (j*(ancho) + index*width + 1 + offset)*2;
+     for (int i = 0; i < width; i++){
+      LCD_DATA(bitmap[k]);
+      LCD_DATA(bitmap[k+1]);
+      k = k + 2;
+     } 
+  }
+    
+    
+    }
+  digitalWrite(LCD_CS, HIGH);
+}
